@@ -43,10 +43,15 @@ int main(int argc,char** argv){
 		return 1;
 	}
 	
+	int counter = 0;	
 	while(1){
 		int r = fread(buf,1,1024,fp);
 		if(r <= 0){
 			break;
+		}
+		else{
+			counter++;
+			printf("%dbyte\n",counter);
 		}
 		int res = uart_write(&u,buf,r);
 		if(res == -1){

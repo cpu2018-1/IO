@@ -7,7 +7,7 @@ int main(){
 	speed_t baud;
 	Uart u;
 
-	baudnum2sym(115200,&baud);
+	baudnum2sym(230400,&baud);
 	int res = uart_open(&u,"/dev/ttyUSB1",&baud);
 	if(res == -1){
 		printf("err open\n");

@@ -10,7 +10,6 @@
 
 #include "uart.h"
 
-#define UART_SHOW_ERROR_LOG
 
 int baudnum2sym(int num_baud, speed_t *sym_baud) {
      int ret;
@@ -52,7 +51,7 @@ int uart_open(Uart *uart_data,char* port_name,speed_t *sym_baud){
 	uart_data->old_valid = 0;
 	// file open
 	int fd;
-	fd = open(port_name,O_RDWR | O_NOCTTY | O_NDELAY);
+	fd = open(port_name,O_RDWR);
 	uart_data->fd = fd;
 	if(fd == -1){
 #ifdef UART_SHOW_ERROR_LOG
@@ -97,6 +96,16 @@ int uart_open(Uart *uart_data,char* port_name,speed_t *sym_baud){
 #endif
 		return -1;
 	}
+
+	res = ioctl(fd, TCSETS, &(uart_data->newio));
+	if (res == -1){
+#ifdef UART_SHOW_ERROR_LOG
+		perror("fail at ioctrl");
+#endif
+		return -1;
+	}
+
+
 	uart_data->old_valid = 1;
 	return 0;
 }
@@ -124,12 +133,38 @@ int uart_close(Uart *uart_data){
 	}
 	if(uart_data->fd != -1){
 		close(uart_data->fd);
+		return ans;
 	}
+
+  if(uart_data->old_valid){
+     res = ioctl(uart_data->fd,TCSETS,&(uart_data->oldio));
+     if (res == -1){
+       while(1){
+         res = ioctl(uart_data->fd,TCSETS,&(uart_data->oldio));
+         if(res != -1){
+           break;
+         }
+         if(errno != EINTR){
+ #ifdef UART_SHOW_ERROR_LOG
+           perror("fail at tcsetattr");
+ #endif
+           ans = -1;
+           break;
+         }
+       }
+     }
+   }
+   if(uart_data->fd != -1){
+     close(uart_data->fd);
+   }
+								
+
 	return ans;
 }
 //succ->0, err->-1
 int uart_write(Uart *uart_data,char* buf,size_t count){
 	int res;
+	int tmp_c = count;
 	while(count > 0){
 		res = write(uart_data->fd,buf,count);
 		if(res == -1 && errno != EINTR){
@@ -138,7 +173,7 @@ int uart_write(Uart *uart_data,char* buf,size_t count){
 #endif
 			return -1;
 		}
-		else if (res == -1 && errno == EINTR){
+		else if (res == -1 && (errno == EINTR)){
 			continue;
 		}
 		else{
@@ -146,7 +181,7 @@ int uart_write(Uart *uart_data,char* buf,size_t count){
 			count -= res;
 		}
 	}
-	return 0;
+	return tmp_c;
 }
 
 //err->-1 succ->num of read_data
